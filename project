@@ -1,0 +1,61 @@
+import streamlit as st
+import pandas as pd
+from sklearn.ensemble import IsolationForest
+from sklearn.linear_model import LinearRegression
+
+# Title of the app
+st.title("AI-Enhanced Data Quality and Predictive Analytics")
+
+# File uploader for user to upload dataset
+uploaded_file = st.file_uploader("Upload your CSV file", type=["csv"])
+
+if uploaded_file is not None:
+    # Read the CSV file
+    data = pd.read_csv(uploaded_file)
+    st.write("### Original Data")
+    st.write(data)
+
+    # Perform data cleaning: Remove rows with missing values
+    cleaned_data = data.dropna()
+    removed_rows = data[data.isnull().any(axis=1)]
+    st.write("### Cleaned Data (Rows with missing values removed):")
+    st.write(cleaned_data)
+
+    # Show the removed rows
+    st.write("### Removed Rows:")
+    st.write(removed_rows)
+
+    # Detect anomalies using Isolation Forest
+    if cleaned_data.select_dtypes(include=[float, int]).shape[1] > 1:
+        clf = IsolationForest(contamination=0.05, random_state=42)
+        clf.fit(cleaned_data.select_dtypes(include=[float, int]))
+        predictions = clf.predict(cleaned_data.select_dtypes(include=[float, int]))
+        anomalies = cleaned_data[predictions == -1]
+        st.write("### Anomalies Detected:")
+        st.write(anomalies)
+
+        # Allow user to download cleaned data and anomalies as CSV
+        cleaned_csv = cleaned_data.to_csv(index=False).encode('utf-8')
+        anomalies_csv = anomalies.to_csv(index=False).encode('utf-8')
+        
+        st.download_button(label="Download Cleaned Data", data=cleaned_csv, file_name="cleaned_data.csv", mime="text/csv")
+        st.download_button(label="Download Anomalies Data", data=anomalies_csv, file_name="anomalies_data.csv", mime="text/csv")
+
+    # Perform predictive analysis (if target column exists)
+    target_column = 'target_column'  # Customize this column
+    if target_column in cleaned_data.columns:
+        X = cleaned_data.drop(target_column, axis=1)
+        y = cleaned_data[target_column]
+        model = LinearRegression()
+        model.fit(X, y)
+        predictions = model.predict(X)
+        prediction_results = pd.DataFrame({'Actual': y, 'Predicted': predictions})
+        st.write("### Predictive Analysis (Linear Regression):")
+        st.write(prediction_results)
+        
+        # Allow user to download predictions as CSV
+        predictions_csv = prediction_results.to_csv(index=False).encode('utf-8')
+        st.download_button(label="Download Predictions", data=predictions_csv, file_name="predictions.csv", mime="text/csv")
+    else:
+        st.write(f"### No target column ('{target_column}') found for predictions.")
+
